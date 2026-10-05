@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Linear Equation Generator</title>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+<style>
+body{font-family:"Segoe UI",sans-serif;background:#eef2ff;margin:0;padding:20px;display:flex;justify-content:center;}
+.app{background:#fff;padding:20px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,0.1);max-width:950px;width:100%;border-top:6px solid #6a5acd;}
+h1{text-align:center;color:#4b3fbf;margin-top:0;}
+.controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px 20px;margin-bottom:20px;}
+.controls label{font-size:.9rem;display:flex;flex-direction:column;gap:4px;color:#333;}
+select,input[type=number]{padding:6px 8px;border-radius:6px;border:1px solid #bbb;font-size:.9rem;}
+.toggle-row{display:flex;align-items:center;gap:8px;font-size:.9rem;color:#333;}
+button{padding:10px 18px;border-radius:6px;border:none;background:#6a5acd;color:white;font-size:1rem;cursor:pointer;margin-top:10px;}
+button:hover{background:#5949c0;}
+#equation{margin-top:20px;padding:15px;background:#fff;border-radius:8px;border:1px solid #ccc;font-size:1.4rem;text-align:center;min-height:60px;}
+.solution{margin-top:20px;padding:15px;background:#f3f0ff;border-radius:8px;border:1px solid #dcd4ff;}
+.solution h2{margin-top:0;font-size:1rem;color:#4b3fbf;}
+.steps{font-size:1rem;line-height:1.5;margin-top:10px;display:none;white-space:pre-line;}
+.answer{font-weight:bold;margin-top:12px;font-size:1.2rem;color:#2d1f8f;}
+#toggleSteps{background:#4b3fbf;margin-bottom:10px;}
+</style>
+</head>
+
+<body>
+<div class="app">
+<h1>Linear Equation Generator</h1>
+
+<div class="controls">
+<label><span>Left side terms</span><input type="number" id="leftCount" min="1" max="6" value="3"></label>
+<label><span>Right side terms</span><input type="number" id="rightCount" min="1" max="6" value="2"></label>
+<label><span>Coefficient type</span>
+<select id="coeffType">
+<option value="int">Integers</option>
+<option value="decimal">Decimals</option>
+<option value="fraction">Fractions</option>
+<option value="mixed">Mixed</option>
+</select></label>
+<label class="toggle-row"><input type="checkbox" id="useParentheses" checked><span>Include parentheses</span></label>
+<label class="toggle-row"><input type="checkbox" id="useNestedParentheses"><span>Allow nested parentheses</span></label>
+<label><span>Special solutions</span>
+<select id="specialSolutions">
+<option value="none">Only unique solutions</option>
+<option value="include">Include no/infinite</option>
+</select></label>
+</div>
+
+<button id="generateBtn">Generate Equation</button>
+<div id="equation"></div>
+
+<div class="solution">
+<button id="toggleSteps">Show Steps</button>
+<h2>Step-by-step solution</h2>
+<div class="steps" id="steps"></div>
+<div class="answer" id="answer"></div>
+</div>
+</div>
+
+<script>
+// FRACTION DISPLAY
+function rationalToLatex(r){r=simplify(r);if(r.den===1)return`${r.num}`;return`\\frac{${r.num}}{${r.den}}`;}
+function displayCoeff(c){if(typeof c==="number")return c;return`\\frac{${c.num}}{${c.den}}`;}
+
+// RATIONAL HELPERS
+function gcd(a,b){return b===0?a:gcd(b,a%b);}
+function simplify(r){if(r.den<0){r.den=-r.den;r.num=-r.num;}const g=gcd(Math.abs(r.num),Math.abs(r.den));return{num:r.num/g,den:r.den/g};}
+function toRational(v){if(typeof v==="number"){const s=v.toString();if(!s.includes("."))return{num:v,den:1};const d=s.split(".")[1].length;const den=Math.pow(10,d);const num=Math.round(v*den);return simplify({num,den});}return simplify(v);}
+function addRational(a,b){return simplify({num:a.num*b.den+b.num*a.den,den:a.den*b.den});}
+function subtractRational(a,b){return simplify({num:a.num*b.den-b.num*a.den,den:a.den*b.den});}
+function multiplyRational(a,b){return simplify({num:a.num*b.num,den:a.den*b.den});}
+
+// PLAIN TEXT FOR STEPS
+function rationalToString(r){r=simplify(r);if(r.den===1)return`${r.num}`;return`${r.num}/${r.den}`;}
+
+// COEFFICIENT GENERATORS
+function randomInt(min=-20,max=20){return Math.floor(Math.random()*(max-min+1))+min;}
+function randomDecimal(){return Math.round((Math.random()*40-20)*10)/10;}
+function randomFraction(){return{num:randomInt(-20,20),den:randomInt(1,20)};}
+function generateCoefficient(type){
+if(type==="mixed"){const r=Math.random();if(r<.33)return randomInt();if(r<.66)return randomDecimal();return randomFraction();}
+if(type==="int")return randomInt();
+if(type==="decimal")return randomDecimal();
+if(type==="fraction")return randomFraction();
+}
+
+// TERM GENERATORS
+function generateSimpleTerm(type,isVar){return{kind:"simple",coeff:generateCoefficient(type),variable:isVar};}
+function generateParenthesisTerm(type){return{kind:"parenthesis",outer:generateCoefficient(type),innerVar:generateCoefficient(type),innerConst:generateCoefficient(type)};}
+function generateNestedParenthesisTerm(type){return{kind:"nested",outer:generateCoefficient(type),innerVar:generateCoefficient(type),innerOuter:generateCoefficient(type),innerInnerVar:generateCoefficient(type),innerInnerConst:generateCoefficient(type)};}
+
+// EXPANSION
+function expandParenthesisTerm(t,steps,label){
+const a=toRational(t.outer),b=toRational(t.innerVar),c=toRational(t.innerConst);
+steps.push(`${label}: Distribute ${displayCoeff(t.outer)} over (${displayCoeff(t.innerVar)}x + ${displayCoeff(t.innerConst)})`);
+const vt=multiplyRational(a,b),ct=multiplyRational(a,c);
+steps.push(`${label}: Becomes ${rationalToString(vt)}x + ${rationalToString(ct)}`);
+return[{kind:"simple",coeff:vt,variable:true},{kind:"simple",coeff:ct,variable:false}];
+}
+
+function expandNestedParenthesisTerm(t,steps,label){
+const a=toRational(t.outer),b=toRational(t.innerVar),c=toRational(t.innerOuter),d=toRational(t.innerInnerVar),e=toRational(t.innerInnerConst);
+steps.push(`${label}: Expand inner parentheses ${displayCoeff(t.innerOuter)}(${displayCoeff(t.innerInnerVar)}x + ${displayCoeff(t.innerInnerConst)})`);
+const iv=multiplyRational(c,d),ic=multiplyRational(c,e);
+const totalVar=addRational(b,iv),totalConst=ic;
+steps.push(`${label}: Inside becomes (${rationalToString(totalVar)}x + ${rationalToString(totalConst)})`);
+const vt=multiplyRational(a,totalVar),ct=multiplyRational(a,totalConst);
+steps.push(`${label}: After distributing ${displayCoeff(t.outer)} → ${rationalToString(vt)}x + ${rationalToString(ct)}`);
+return[{kind:"simple",coeff:vt,variable:true},{kind:"simple",coeff:ct,variable:false}];
+}
+
+function preprocessSide(terms,steps,label){
+let out=[];
+terms.forEach(t=>{
+if(t.kind==="parenthesis")out.push(...expandParenthesisTerm(t,steps,label));
+else if(t.kind==="nested")out.push(...expandNestedParenthesisTerm(t,steps,label));
+else out.push({kind:"simple",coeff:toRational(t.coeff),variable:t.variable});
+});
+return out;
+}
+
+// EQUATION GENERATION (TERM COUNT BEFORE EXPANSION)
+function generateEquation(lc,rc,type,useP,useN,allowSpecial){
+function randomTerm(){
+const r=Math.random();
+if(!useP&&!useN)return generateSimpleTerm(type,Math.random()<.5);
+if(useN&&r<.2)return generateNestedParenthesisTerm(type);
+if(useP&&r<.5)return generateParenthesisTerm(type);
+return generateSimpleTerm(type,Math.random()<.5);
+}
+let left=Array.from({length:lc},randomTerm);
+let right=Array.from({length:rc},randomTerm);
+
+// special solutions WITHOUT changing term count
+if(allowSpecial&&Math.random()<.3){
+const st=Math.random()<.5?"infinite":"none";
+if(st==="infinite"){
+right=right.map((t,i)=>JSON.parse(JSON.stringify(left[i%left.length])));
+}else{
+right=right.map((t,i)=>JSON.parse(JSON.stringify(left[i%left.length])));
+right.push({kind:"simple",coeff:generateCoefficient(type),variable:false});
+}
+}
+
+return{left,right};
+}
+
+// SOLVER
+function solveEquation(eq){
+const steps=[];
+steps.push("Step 1: Expand parentheses.");
+const L=preprocessSide(eq.left,steps,"Left");
+const R=preprocessSide(eq.right,steps,"Right");
+
+steps.push("Step 2: Combine like terms.");
+let vl={num:0,den:1},cl={num:0,den:1},vr={num:0,den:1},cr={num:0,den:1};
+L.forEach(t=>t.variable?vl=addRational(vl,t.coeff):cl=addRational(cl,t.coeff));
+R.forEach(t=>t.variable?vr=addRational(vr,t.coeff):cr=addRational(cr,t.coeff));
+
+steps.push(`Left side: ${rationalToString(vl)}x + ${rationalToString(cl)}`);
+steps.push(`Right side: ${rationalToString(vr)}x + ${rationalToString(cr)}`);
+
+steps.push("Step 3: Move x terms left and constants right.");
+const m=subtractRational(vl,vr);
+const b=subtractRational(cr,cl);
+
+steps.push(`Coefficient of x: ${rationalToString(m)}`);
+steps.push(`Constant: ${rationalToString(b)}`);
+
+if(m.num===0&&b.num===0){
+steps.push("Step 4: 0x = 0 → infinitely many solutions.");
+return{type:"infinite",steps,solution:null};
+}
+if(m.num===0&&b.num!==0){
+steps.push("Step 4: 0x = non-zero → no solution.");
+return{type:"none",steps,solution:null};
+}
+
+const sol=simplify({num:b.num*m.den,den:b.den*m.num});
+steps.push(`Step 4: x = ${rationalToString(sol)}`);
+return{type:"unique",steps,solution:sol};
+}
+
+// DISPLAY
+function termToLatex(t){
+if(t.kind==="simple"){
+const c=t.coeff;
+const d=typeof c==="number"?c:rationalToLatex(c);
+if(t.variable){
+if(d===1)return"x";
+if(d===-1)return"-x";
+return`${d}x`;
+}
+return`${d}`;
+}
+if(t.kind==="parenthesis"){
+return`${displayCoeff(t.outer)}\\left(${displayCoeff(t.innerVar)}x + ${displayCoeff(t.innerConst)}\\right)`;
+}
+return`${displayCoeff(t.outer)}\\left(${displayCoeff(t.innerVar)}x + ${displayCoeff(t.innerOuter)}\\left(${displayCoeff(t.innerInnerVar)}x + ${displayCoeff(t.innerInnerConst)}\\right)\\right)`;
+}
+
+function sideToLatex(terms){
+let s="";
+terms.forEach((t,i)=>{
+const ts=termToLatex(t);
+if(i===0)s+=ts;
+else s+=ts.startsWith("-")?" - "+ts.slice(1):" + "+ts;
+});
+return s||"0";
+}
+
+function renderEquation(eq){
+const left=sideToLatex(eq.left);
+const right=sideToLatex(eq.right);
+document.getElementById("equation").innerHTML=`\\(${left} = ${right}\\)`;
+MathJax.typeset();
+}
+
+// UI
+document.getElementById("generateBtn").addEventListener("click",()=>{
+const lc=+document.getElementById("leftCount").value;
+const rc=+document.getElementById("rightCount").value;
+const type=document.getElementById("coeffType").value;
+const useP=document.getElementById("useParentheses").checked;
+const useN=document.getElementById("useNestedParentheses").checked;
+const special=document.getElementById("specialSolutions").value==="include";
+
+const eq=generateEquation(lc,rc,type,useP,useN,special);
+renderEquation(eq);
+
+const result=solveEquation(eq);
+document.getElementById("steps").textContent=result.steps.join("\n");
+const ans=document.getElementById("answer");
+
+if(result.type==="unique"){
+ans.innerHTML=`Final answer: \\( x = ${rationalToLatex(result.solution)} \\)`;
+MathJax.typeset();
+}else if(result.type==="none"){
+ans.textContent="Final answer: No solution.";
+}else{
+ans.textContent="Final answer: Infinitely many solutions.";
+}
+});
+
+// SHOW/HIDE STEPS
+document.getElementById("toggleSteps").addEventListener("click",()=>{
+const s=document.getElementById("steps");
+const b=document.getElementById("toggleSteps");
+if(s.style.display==="none"){s.style.display="block";b.textContent="Hide Steps";}
+else{s.style.display="none";b.textContent="Show Steps";}
+});
+</script>
+
+</body>
+</html>
