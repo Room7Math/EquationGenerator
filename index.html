@@ -72,7 +72,7 @@ button:hover{background:#5949c0;}
         <p>Author: Jin Young Chang<br/>
         <a href="mailto:chang_j@auhsd.us">chang_j@auhsd.us</a><br/>
         © 2026<br/>
-		very much a beta version 0.13</P>
+		very much a beta version 0.15</P>
     </footer>
 
 
@@ -95,15 +95,21 @@ function multiplyRational(a,b){return simplify({num:a.num*b.num,den:a.den*b.den}
 function rationalToString(r){r=simplify(r);if(r.den===1)return`${r.num}`;return`${r.num}/${r.den}`;}
 
 // COEFFICIENT GENERATORS
-function randomInt(min=-10,max=10){
+function randomInt(min=-9,max=9){
 	let value = Math.floor(Math.random()*(max-min+1))+min;
 	if (value == 0 )
 		return 1;
 	else return value;
 }
-function randomDecimal(){return Math.round((Math.random()*20-10)*10)/10;}
+function randomDecimal(){
+	if (Math.random() < .45)
+		return randomInt();
+	return Math.round((Math.random()*20-10)*10)/10;
+}
 
 function randomFraction(){
+	if (Math.random() < .45)
+		return randomInt();
 	let numer = randomInt(-5, 5);
 	let denom = numer;
 	while(denom == numer){
