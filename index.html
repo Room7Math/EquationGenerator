@@ -72,7 +72,7 @@ button:hover{background:#5949c0;}
         <p>Author: Jin Young Chang<br/>
         <a href="mailto:chang_j@auhsd.us">chang_j@auhsd.us</a><br/>
         © 2026<br/>
-		very much a beta version 0.12</P>
+		very much a beta version 0.13</P>
     </footer>
 
 
@@ -109,7 +109,8 @@ function randomFraction(){
 	while(denom == numer){
 		denom = randomInt(2,6);
 	}
-	return {num:numer,den:denom};
+	return simplify({num:numer,den:denom});
+	//return {num:numer,den:denom};
 
 	//return{num:randomInt(-10,10),den:randomInt(1,9)};
 
@@ -156,15 +157,18 @@ else out.push({kind:"simple",coeff:toRational(t.coeff),variable:t.variable});
 return out;
 }
 
+
+
+
 // EQUATION GENERATION (TERM COUNT BEFORE EXPANSION)
 function generateEquation(lc,rc,type,useP,useN,allowSpecial){
-function randomTerm(){
-const r=Math.random();
-if(!useP&&!useN)return generateSimpleTerm(type,Math.random()<.5);
-if(useN&&r<.2)return generateNestedParenthesisTerm(type);
-if(useP&&r<.5)return generateParenthesisTerm(type);
-return generateSimpleTerm(type,Math.random()<.5);
-}
+	function randomTerm(){
+	const r=Math.random();
+	if(!useP&&!useN)return generateSimpleTerm(type,Math.random()<.5);
+	if(useN&&r<.2)return generateNestedParenthesisTerm(type);
+	if(useP&&r<.5)return generateParenthesisTerm(type);
+	return generateSimpleTerm(type,Math.random()<.5);
+	}
 let left=Array.from({length:lc},randomTerm);
 let right=Array.from({length:rc},randomTerm);
 
@@ -179,8 +183,47 @@ right.push({kind:"simple",coeff:generateCoefficient(type),variable:false});
 }
 }
 
+// Ensure at least one variable term on each side WITHOUT adding terms
+function forceVariable(terms) {
+  // Check if any term is already a variable
+  const hasVar = terms.some(t => t.kind === "simple" && t.variable);
+
+  if (!hasVar) {
+    // Find the first simple term and convert it to a variable term
+    for (let t of terms) {
+      if (t.kind === "simple") {
+        t.variable = true;
+        break;
+      }
+    }
+  }
+}
+
+// Ensure at least one constant term on each side WITHOUT adding terms
+function forceConstant(terms) {
+  const hasConst = terms.some(t => t.kind === "simple" && !t.variable);
+
+  if (!hasConst) {
+    // Convert the first simple variable term into a constant
+    for (let t of terms) {
+      if (t.kind === "simple" && t.variable) {
+        t.variable = false;
+        break;
+      }
+    }
+  }
+}
+
+// Apply to both sides
+forceVariable(left);
+forceVariable(right);
+forceConstant(left);
+forceConstant(right);
+
 return{left,right};
 }
+
+
 
 // SOLVER
 function solveEquation(eq){
