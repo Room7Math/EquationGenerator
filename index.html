@@ -84,10 +84,10 @@ function randomInt(min=-10,max=10){
 function randomDecimal(){return Math.round((Math.random()*20-10)*10)/10;}
 
 function randomFraction(){
-	let numer = randomInt(-9, 9);
+	let numer = randomInt(-5, 5);
 	let denom = numer;
 	while(denom == numer){
-		denom = randomInt(2,9);
+		denom = randomInt(2,6);
 	}
 	return {num:numer,den:denom};
 
