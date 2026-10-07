@@ -75,9 +75,25 @@ function multiplyRational(a,b){return simplify({num:a.num*b.num,den:a.den*b.den}
 function rationalToString(r){r=simplify(r);if(r.den===1)return`${r.num}`;return`${r.num}/${r.den}`;}
 
 // COEFFICIENT GENERATORS
-function randomInt(min=-20,max=20){return Math.floor(Math.random()*(max-min+1))+min;}
-function randomDecimal(){return Math.round((Math.random()*40-20)*10)/10;}
-function randomFraction(){return{num:randomInt(-20,20),den:randomInt(1,20)};}
+function randomInt(min=-10,max=10){
+	let value = Math.floor(Math.random()*(max-min+1))+min;
+	if (value == 0 )
+		return 1;
+	else return value;
+}
+function randomDecimal(){return Math.round((Math.random()*20-10)*10)/10;}
+
+function randomFraction(){
+	let numer = randomInt(-9, 9);
+	let denom = numer;
+	while(denom == numer){
+		denom = randomInt(2,9);
+	}
+	return {num:numer,den:denom};
+
+	//return{num:randomInt(-10,10),den:randomInt(1,9)};
+
+}
 function generateCoefficient(type){
 if(type==="mixed"){const r=Math.random();if(r<.33)return randomInt();if(r<.66)return randomDecimal();return randomFraction();}
 if(type==="int")return randomInt();
@@ -251,12 +267,6 @@ if(s.style.display==="none"){s.style.display="block";b.textContent="Hide Steps";
 else{s.style.display="none";b.textContent="Show Steps";}
 });
 </script>
-<hr/>
-<footer>
-  <p>Author: Jin Young Chang</p>
-  <p><a href="mailto:chang_j@auhsd.us">chang_j@auhsd.us</a></p>
-  <p>© 2026</p>
-  <p>Software version: 0.8 beta</p>
-</footer>
+
 </body>
 </html>
