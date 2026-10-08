@@ -220,11 +220,27 @@ function forceConstant(terms) {
   }
 }
 
+if (lc == 1 && rc == 1)
+{
+	if ( Math.random() < 0.5)
+	{
+		forceVariable(right);
+		forceConstant(left);
+	}
+	else {
+		forceVariable(left);
+		forceConstant(right);
+	}
+}
+else
+{
+
 // Apply to both sides
 forceVariable(left);
 forceVariable(right);
 forceConstant(left);
 forceConstant(right);
+}
 
 return{left,right};
 }
